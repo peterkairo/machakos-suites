@@ -1,3 +1,4 @@
+
 name: Build and deploy to GitHub Pages
 
 on:
@@ -33,3 +34,51 @@ jobs:
 
       - name: Deploy to GitHub Pages
         uses: actions/deploy-pages@v2
+
+  verify-deployment:
+    needs: build-and-deploy
+    runs-on: ubuntu-latest
+    if: ${{ needs.build-and-deploy.result == 'success' }}
+    timeout-minutes: 30
+
+    steps:
+      - name: Wait for DNS and site availability
+        env:
+          DOMAIN: machakossuites.com
+        run: |
+          set -euo pipefail
+          echo "Verifying DNS and HTTP for $DOMAIN"
+          ip=""
+          for i in $(seq 1 30); do
+            ip=$(python3 - <<PY
+import socket
+import sys
+try:
+    print(socket.gethostbyname("$DOMAIN"))
+except Exception:
+    sys.exit(1)
+PY
+            ) || true
+            if [ -n "$ip" ]; then
+              echo "Resolved $DOMAIN -> $ip"
+              break
+            fi
+            echo "Attempt $i: DNS not resolved yet, sleeping 10s"
+            sleep 10
+          done
+          if [ -z "$ip" ]; then
+            echo "DNS did not resolve within timeout" >&2
+            exit 1
+          fi
+          echo "Checking HTTP response for https://$DOMAIN"
+          for i in $(seq 1 30); do
+            status=$(curl -s -o /dev/null -w "%{http_code}" -L --max-time 10 https://$DOMAIN || echo "000")
+            echo "Attempt $i: HTTP status $status"
+            if [ "$status" = "200" ] || [ "$status" = "301" ] || [ "$status" = "302" ]; then
+              echo "Site reachable with status $status"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Site not reachable after timeout" >&2
+          exit 1
