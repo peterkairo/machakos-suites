@@ -23,3 +23,16 @@ If you'd like, I can:
 - Use Vercel or Netlify instead (they provide automatic HTTPS and easier DNS setup) — tell me which provider and I'll prepare the config.
 
 Tell me the custom domain you want and whether you'd like me to attempt pushing the `CNAME` and triggering deployment.
+
+Applying DB migrations
+-----------------------
+
+To apply the SQL migrations included in `db/migrations/001_init.sql` to a Supabase/Postgres database we provide a workflow `.github/workflows/db-migrate.yml` that runs `psql` against a `SUPABASE_DB_URL` secret.
+
+How to run migrations automatically:
+
+- Add a repository secret named `SUPABASE_DB_URL` containing your Postgres connection string (e.g. `postgres://user:pass@host:5432/database`).
+- Trigger the workflow via GitHub Actions UI (Workflows → "Apply DB migrations to Supabase") or push to `main`.
+
+Important: the workflow requires that the connection string has sufficient privileges to create tables and functions (service role or admin user).
+
